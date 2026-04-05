@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>محرر الأسئلة الشامل - Exam Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .q-item.active {
+            background-color: #eff6ff;
+            border-right: 4px solid #2563eb;
+        }
+    </style>
+</head>
+
+<body class="text-gray-800 h-screen overflow-hidden flex flex-col">
+    <!-- Header -->
+    <header class="bg-blue-800 text-white p-4 shadow-md flex justify-between items-center z-10">
+        <h1 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-pen-to-square"></i> محرر الأسئلة
+            الاحترافي</h1>
+        <div class="flex gap-2 flex-wrap">
+            <button id="quickPasteBtnEditor"
+                class="bg-yellow-500 hover:bg-yellow-600 transition px-4 py-2 rounded text-sm flex items-center gap-1"><i
+                    class="fa-solid fa-paste"></i> لصق سريع</button>
+            <button id="sheetsImportBtn"
+                class="bg-teal-600 hover:bg-teal-700 transition px-4 py-2 rounded text-sm flex items-center gap-1"><i
+                    class="fa-brands fa-google"></i> Google Sheets</button>
+            <button id="importBtn"
+                class="bg-green-600 hover:bg-green-700 transition px-4 py-2 rounded text-sm flex items-center gap-1"><i
+                    class="fa-solid fa-file-import"></i> استيراد ملف</button>
+            <button id="exportBtn"
+                class="bg-blue-500 hover:bg-blue-600 transition px-4 py-2 rounded text-sm flex items-center gap-1"><i
+                    class="fa-solid fa-file-export"></i> تصدير JSON</button>
+            <a href="index.html"
+                class="bg-gray-600 hover:bg-gray-700 transition px-4 py-2 rounded text-sm flex items-center gap-1"><i
+                    class="fa-solid fa-arrow-left"></i> عودة للمنصة</a>
+        </div>
+        <input type="file" id="fileInput" accept=".json,.csv,.txt" class="hidden">
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Sidebar -->
+        <aside
+            class="w-1/3 max-w-sm bg-white border-l border-gray-300 flex flex-col shadow-[2px_0_5px_rgba(0,0,0,0.05)] z-0">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <h2 class="font-bold text-gray-700">الأسئلة (<span id="qCount">0</span>)</h2>
+                <button id="addBtn" class="text-blue-600 hover:text-blue-800 transition" title="إضافة سؤال جديد"><i
+                        class="fa-solid fa-circle-plus text-2xl"></i></button>
+            </div>
+            <div id="qList" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <!-- Items injected here -->
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="flex-1 p-6 overflow-y-auto bg-gray-100 relative" id="mainWorkspace">
+
+            <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                <i class="fa-solid fa-clipboard-question text-6xl mb-4 opacity-50"></i>
+                <p class="text-xl font-bold">اختر سؤالاً للتعديل أو أضف سؤالاً جديداً من القائمة الجانبية</p>
+                <p class="text-sm mt-2 opacity-75">المحرر يدعم (MCQ, صح/خطأ، مطابقة، ومقاليات) مع الصور والتوضيح.</p>
+            </div>
+
+            <div id="editorArea" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 max-w-3xl mx-auto"
+                style="display:none;">
+                <div class="flex justify-between items-center mb-6 border-b pb-4">
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2"><i
+                            class="fa-solid fa-sliders text-blue-600"></i> تفاصيل السؤال</h2>
+                    <div class="flex gap-2 flex-wrap">
+                        <button id="copyQuestionBtn"
+                            class="text-gray-600 hover:text-blue-600 border border-gray-300 hover:border-blue-500 transition px-3 py-1 rounded text-sm flex items-center gap-1 bg-gray-50 hover:bg-blue-50"
+                            title="نسخ السؤال الحالي"><i class="fa-solid fa-copy"></i> نسخ</button>
+                        <button id="pasteQuestionBtn"
+                            class="text-gray-600 hover:text-green-600 border border-gray-300 hover:border-green-500 transition px-3 py-1 rounded text-sm flex items-center gap-1 bg-gray-50 hover:bg-green-50"
+                            title="لصق سؤال جديد من الحافظة"><i class="fa-solid fa-paste"></i> لصق</button>
+                        <button id="deleteBtn"
+                            class="text-red-500 hover:text-white hover:bg-red-500 border border-red-500 transition px-3 py-1 rounded text-sm flex items-center gap-1"><i
+                                class="fa-solid fa-trash"></i> حذف</button>
+                    </div>
+                </div>
+
+                <div class="space-y-5">
+                    <!-- Type -->
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">نوع السؤال</label>
+                        <select id="edit-type"
+                            class="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:border-blue-500 outline-none bg-gray-50 transition">
+                            <option value="mcq">اختيار من متعدد (MCQ)</option>
+                            <option value="boolean">صح / خطأ</option>
+                            <option value="match">مطابقة (Match)</option>
+                            <option value="written">مقال (Essay)</option>
+                        </select>
+                    </div>
+
+                    <!-- Question Text -->
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">نص السؤال *</label>
+                        <textarea id="edit-text" rows="3"
+                            class="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:border-blue-500 outline-none transition"
+                            placeholder="اكتب نص السؤال بدقة..."></textarea>
+                    </div>
+
+                    <!-- Image URL -->
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">رابط الصورة (اختياري)</label>
+                        <div class="flex gap-2">
+                            <span class="bg-gray-100 border border-gray-300 rounded p-2 text-gray-500"><i
+                                    class="fa-solid fa-image"></i></span>
+                            <input type="text" id="edit-image"
+                                class="flex-1 border border-gray-300 rounded p-2 focus:ring-2 focus:border-blue-500 outline-none transition"
+                                placeholder="https://example.com/image.png">
+                        </div>
+                    </div>
+
+                    <hr class="border-gray-200">
+
+                    <!-- MCQ Options -->
+                    <div id="section-options" class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <label class="block text-sm font-bold text-gray-700">الخيارات & الإجابة الصحيحة</label>
+                            <button type="button" id="addOptionBtn"
+                                class="text-xs bg-green-100 text-green-700 hover:bg-green-200 px-2 py-1 rounded transition"><i
+                                    class="fa-solid fa-plus"></i> إضافة خيار</button>
+                        </div>
+                        <div id="options-container" class="space-y-2"></div>
+                        <p class="text-xs text-blue-600 mt-1"><i class="fa-solid fa-info-circle"></i> حدد الزر الدائري
+                            بجانب الخيار لتعيينه كإجابة صحيحة.</p>
+                    </div>
+
+                    <!-- Boolean -->
+                    <div id="section-boolean" class="space-y-2 hidden">
+                        <label class="block text-sm font-bold text-gray-700">الإجابة الصحيحة</label>
+                        <select id="edit-bool-answer"
+                            class="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:border-blue-500 outline-none bg-gray-50">
+                            <option value="true">صح (True)</option>
+                            <option value="false">خطأ (False)</option>
+                        </select>
+                    </div>
+
+                    <!-- Match -->
+                    <div id="section-match" class="space-y-3 hidden">
+                        <div class="flex justify-between items-center">
+                            <label class="block text-sm font-bold text-gray-700">أزواج التطابق (المصطلح وما
+                                يقابله)</label>
+                            <button type="button" id="addPairBtn"
+                                class="text-xs bg-green-100 text-green-700 hover:bg-green-200 px-2 py-1 rounded transition"><i
+                                    class="fa-solid fa-plus"></i> إضافة زوج جديد</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mb-1">
+                            <div class="text-xs font-bold text-gray-500 text-center">المصطلح (Left)</div>
+                            <div class="text-xs font-bold text-gray-500 text-center">الخيار المطابق (Right)</div>
+                        </div>
+                        <div id="pairs-container" class="space-y-2"></div>
+                    </div>
+
+                    <!-- Written / Essay -->
+                    <div id="section-written" class="space-y-2 hidden">
+                        <label class="block text-sm font-bold text-gray-700 mb-1">الكلمات المفتاحية المثالية للتقييم
+                            الآلي (مفصولة بفاصلة)</label>
+                        <textarea id="edit-keywords" rows="2"
+                            class="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:border-blue-500 outline-none"
+                            placeholder="كلمة مفتاحية 1, كلمة مفتاحية 2..."></textarea>
+                    </div>
+
+                    <hr class="border-gray-200">
+
+                    <!-- Category -->
+                    <div class="bg-purple-50 p-4 rounded border border-purple-100">
+                        <label class="block text-sm font-bold text-purple-800 mb-1"><i class="fa-solid fa-tag"></i>
+                            تصنيف السؤال (يظهر في المراجعة)</label>
+                        <input type="text" id="edit-category"
+                            class="w-full border border-purple-200 rounded p-2 focus:ring-2 focus:border-purple-500 outline-none transition bg-white"
+                            placeholder="مثال: القواعد، النصوص، الفصل الأول...">
+                    </div>
+
+                    <!-- Key Explain -->
+                    <div class="bg-blue-50 p-4 rounded border border-blue-100">
+                        <label class="block text-sm font-bold text-blue-800 mb-1"><i class="fa-solid fa-lightbulb"></i>
+                            توضيح الإجابة (يظهر بعد التسليم)</label>
+                        <textarea id="edit-explain" rows="3"
+                            class="w-full border border-blue-200 rounded p-2 focus:ring-2 focus:border-blue-500 outline-none transition bg-white"
+                            placeholder="اشرح هنا للطالب سبب اختيار الإجابة الصحيحة..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Google Sheets Import Modal -->
+    <div id="sheetsModal"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden">
+            <div class="bg-teal-700 text-white p-4 flex justify-between items-center">
+                <h3 class="font-bold flex items-center gap-2"><i class="fa-brands fa-google"></i> استيراد من Google Sheets</h3>
+                <button id="closeSheetsModalBtn" class="text-white hover:text-gray-300 transition"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <div class="p-6 text-right" dir="rtl">
+                <p class="text-sm text-gray-600 mb-3">الصق رابط جدول Google Sheets العام. يجب أن يكون الجدول يحتوي على أسئلة بصيغة JSON Capsule أو CSV.</p>
+                <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-4"><i class="fa-solid fa-triangle-exclamation"></i> تأكد أن الجدول مشارك بصلاحية "أي شخص لديه الرابط".</p>
+                <input type="text" id="sheetsUrlInput"
+                    class="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:border-teal-500 outline-none mb-4"
+                    dir="ltr" placeholder="https://docs.google.com/spreadsheets/d/...">
+            </div>
+            <div class="p-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+                <button id="cancelSheetsBtn" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition">إلغاء</button>
+                <button id="fetchSheetsBtn" class="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition flex items-center gap-2"><i class="fa-solid fa-cloud-arrow-down"></i> جلب الأسئلة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Paste Modal for Editor -->
+    <div id="pasteModalEditor"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col">
+            <div class="bg-blue-800 text-white p-4 flex justify-between items-center">
+                <h3 class="font-bold flex items-center gap-2"><i class="fa-solid fa-paste"></i> لصق الأسئلة السريع</h3>
+                <button id="closePasteModalBtn" class="text-white hover:text-gray-300 transition"><i
+                        class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <div class="p-6 flex-1 flex flex-col gap-4 text-right" dir="rtl">
+                <p class="text-sm text-gray-600 mb-2">الصق أسئلتك هنا. يمكنك استخدام صيغة JSON أو جدول CSV.</p>
+                <textarea id="pasteTextareaEditor"
+                    class="w-full border border-gray-300 rounded p-3 h-48 focus:ring-2 focus:border-blue-500 outline-none"
+                    dir="ltr"
+                    placeholder="ID;Question;Options;Correct Answer;Image Link;Explain;Points&#10;mcq;What is 2+2?;3|4|5;4;N/A;N/A;1"></textarea>
+            </div>
+            <div class="p-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+                <button id="cancelPasteBtn"
+                    class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition">إلغاء</button>
+                <button id="loadPasteBtnEditor"
+                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">تحميل
+                    الأسئلة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast"
+        class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-50">
+        تم الحفظ بنجاح
+    </div>
+
+    <script type="module" src="js/editor.js"></script>
+</body>
+
+</html>
